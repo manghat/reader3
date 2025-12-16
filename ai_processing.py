@@ -32,6 +32,46 @@ except ImportError:  # pragma: no cover - optional in dev
 
 # --- Data containers ---
 
+_logfire_configured = False
+
+def _load_env_from_file(path: str = ".env") -> None:
+    """
+    Lightweight .env loader to avoid external deps.
+    Only sets variables that are not already defined.
+    """
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, val = stripped.split("=", 1)
+        key = key.strip()
+        val = val.strip()
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+def _configure_logfire_if_possible() -> None:
+    global _logfire_configured
+    if _logfire_configured or not logfire:
+        return
+    token = os.getenv("LOGFIRE_TOKEN")
+    if not token:
+        return
+    try:
+        # Configure once; ignore failures so the app still runs.
+        logfire.configure(token=token)
+        _logfire_configured = True
+    except Exception:
+        pass
+
+
+_load_env_from_file()
+_configure_logfire_if_possible()
+
+
 @dataclass
 class ParagraphAnnotation:
     paragraph_id: str
