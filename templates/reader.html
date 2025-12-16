@@ -329,6 +329,39 @@
             border: 1px solid #f1deb0;
         }
         .processing-banner.show { display: block; }
+
+        .ai-status {
+            font-family: var(--sans);
+            margin-bottom: 12px;
+            display: grid;
+            gap: 6px;
+        }
+        .ai-status-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .status-pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.85em;
+            border: 1px solid var(--border);
+        }
+        .status-pill.success { background: #e4f6eb; color: #1b7a3e; border-color: #b5e0c3; }
+        .status-pill.failed { background: #ffecec; color: #a50000; border-color: #ffc4c4; }
+        .status-pill.processing { background: #fff3cd; color: #7d510d; border-color: #f1deb0; }
+        .status-pill.idle { background: #f1f1f1; color: #555; }
+        .ai-meta { color: #666; font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 8px; }
+        .ai-error { color: #a50000; font-size: 0.9em; }
+
+        @media (max-width: 720px) {
+            #main { margin-left: 0; padding: 20px; }
+            .mode-bar { justify-content: flex-start; }
+            #process-ai { margin-left: 0; }
+            .ai-meta { flex-direction: column; }
+        }
     </style>
 </head>
 <body>
@@ -412,6 +445,14 @@
     <div id="main">
         <div class="content-container">
             <div class="processing-banner" id="processing-banner">Processing... check console for updates.</div>
+            <div class="ai-status" id="ai-status">
+                <div class="ai-status-row">
+                    <span class="status-pill idle" id="ai-status-pill">Idle</span>
+                    <span class="ai-meta" id="ai-status-text">Not processed yet.</span>
+                </div>
+                <div class="ai-meta" id="ai-status-meta"></div>
+                <div class="ai-error" id="ai-status-error"></div>
+            </div>
             {% set path = section_path if section_path is defined and section_path else [{'title': current_chapter.title}] %}
             {% set current_section = path|last %}
             <div class="section-meta">
@@ -479,6 +520,53 @@
             {% endfor %}
         };
 
+        const aiDoc = {{ ai_doc_json | safe }};
+        const aiStatusPill = document.getElementById("ai-status-pill");
+        const aiStatusText = document.getElementById("ai-status-text");
+        const aiStatusMeta = document.getElementById("ai-status-meta");
+        const aiStatusError = document.getElementById("ai-status-error");
+
+        function formatStatus(doc) {
+            const hasData = doc && Object.keys(doc).length > 0;
+            const status = doc.status || (hasData ? "success" : "idle");
+            return {
+                status,
+                source: doc.source || (hasData ? "cache" : ""),
+                run_id: doc.run_id || "",
+                created_at: doc.created_at || "",
+                error: doc.error || "",
+                run_duration_ms: doc.run_duration_ms || null,
+            };
+        }
+
+        function renderStatus(doc, isProcessing = false) {
+            const state = formatStatus(doc || {});
+            if (isProcessing) {
+                state.status = "processing";
+            }
+            aiStatusPill.className = `status-pill ${state.status}`;
+            aiStatusPill.textContent = state.status.charAt(0).toUpperCase() + state.status.slice(1);
+
+            if (state.status === "processing") {
+                aiStatusText.textContent = "Processing chapter AI...";
+            } else if (state.status === "failed") {
+                aiStatusText.textContent = "AI run failed. Please retry.";
+            } else if (state.status === "success") {
+                aiStatusText.textContent = `AI overlays ready (${state.source || "fresh"}).`;
+            } else {
+                aiStatusText.textContent = "Not processed yet.";
+            }
+
+            const metaParts = [];
+            if (state.created_at) metaParts.push(`Last run: ${state.created_at}`);
+            if (state.run_duration_ms) metaParts.push(`Duration: ${state.run_duration_ms} ms`);
+            if (state.source && state.status !== "processing") metaParts.push(`Source: ${state.source}`);
+            aiStatusMeta.textContent = metaParts.join(" • ");
+            aiStatusError.textContent = state.error ? `Error: ${state.error}` : "";
+        }
+
+        renderStatus(aiDoc);
+
         function findAndGo(filename) {
             const cleanFile = filename.split('#')[0];
             const idx = spineMap[cleanFile];
@@ -527,16 +615,21 @@
         async function triggerAI() {
             const banner = document.getElementById("processing-banner");
             banner.classList.add("show");
+            renderStatus(aiDoc, true);
             try {
                 const resp = await fetch(`/read/{{ book_id }}/{{ chapter_index }}/process_ai`, { method: "POST" });
                 if (!resp.ok) {
                     throw new Error(`Failed: ${resp.status}`);
                 }
                 const data = await resp.json();
-                console.log("AI result", data);
-                window.location.reload();
+                Object.assign(aiDoc, data);
+                renderStatus(aiDoc);
+                if (data.status !== "failed") {
+                    window.location.reload();
+                }
             } catch (err) {
                 console.error(err);
+                renderStatus({ status: "failed", error: err.message });
                 alert("AI processing failed: " + err.message);
             } finally {
                 banner.classList.remove("show");

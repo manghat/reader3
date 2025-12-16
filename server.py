@@ -202,6 +202,7 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         "next_idx": next_idx,
         "chapter_doc": chapter_doc,
         "ai_doc": ai_doc,
+        "ai_doc_json": json.dumps(ai_doc or {}),
         "paragraphs": paragraphs_for_render,
         "section_path": section_path,
     })
