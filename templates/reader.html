@@ -4,38 +4,331 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.metadata.title }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cabin:wght@400;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --sand: #f5efe6;
+            --ink: #1f1b16;
+            --muted: #6d645a;
+            --accent: #c65f2d;
+            --accent-soft: #e5d3c1;
+            --card: #fffaf3;
+            --border: #e6ded1;
+            --sidebar: #f1e9df;
+            --serif: "Merriweather", "Iowan Old Style", "Palatino", "Book Antiqua", Georgia, serif;
+            --sans: "Cabin", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
         /* Layout */
-        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: #fff; }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            font-family: var(--serif);
+            background: linear-gradient(135deg, #f8f3eb 0%, #f3ede4 50%, #f8f3eb 100%);
+            color: var(--ink);
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            letter-spacing: 0.01em;
+            font-size: 18px;
+            line-height: 1.65;
+            font-feature-settings: "liga" 1, "onum" 1, "kern" 1;
+        }
 
         /* Sidebar */
-        #sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #e9ecef; overflow-y: auto; padding: 20px; flex-shrink: 0; }
-        .nav-header { font-family: -apple-system, sans-serif; font-weight: bold; color: #495057; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; }
-        .nav-home { display: block; margin-bottom: 20px; color: #3498db; text-decoration: none; font-family: -apple-system, sans-serif; font-size: 0.9em; }
+        #sidebar {
+            width: 340px;
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 26px 22px;
+            flex-shrink: 0;
+            box-shadow: 6px 0 18px rgba(0, 0, 0, 0.03);
+        }
+        .nav-header {
+            font-family: var(--sans);
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 10px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            letter-spacing: -0.01em;
+            line-height: 1.2;
+        }
+        .nav-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 18px;
+            color: var(--accent);
+            text-decoration: none;
+            font-family: var(--sans);
+            font-size: 0.92em;
+            font-weight: 600;
+        }
+        .nav-home:hover { text-decoration: underline; }
+        .author-line {
+            font-family: var(--sans);
+            font-size: 0.9em;
+            color: var(--muted);
+            margin-bottom: 18px;
+            letter-spacing: 0.01em;
+        }
 
         /* TOC Tree */
         ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
         ul.toc-list ul { padding-left: 20px; } /* Indent children */
-        li.toc-item { margin-bottom: 8px; }
-        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 4px 0; line-height: 1.4; }
-        a.toc-link:hover { color: #000; text-decoration: underline; }
-        a.toc-link.active { color: #d63384; font-weight: bold; }
+        li.toc-item { margin-bottom: 10px; }
+        a.toc-link {
+            text-decoration: none;
+            color: var(--ink);
+            font-size: 0.97em;
+            display: block;
+            padding: 6px 0;
+            line-height: 1.4;
+            transition: color 0.15s ease, transform 0.15s ease;
+        }
+        a.toc-link:hover { color: var(--accent); transform: translateX(2px); }
+        a.toc-link.active { color: var(--accent); font-weight: 700; }
+
+        /* Sidebar Tabs */
+        .sidebar-section { margin-top: 26px; font-family: var(--sans); }
+        .sidebar-tabs { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .sidebar-tabs button {
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 7px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 0.92em;
+            color: var(--muted);
+            transition: all 0.15s ease;
+        }
+        .sidebar-tabs button.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 6px 12px rgba(198, 95, 45, 0.2);
+        }
+        .tab-panel {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 0.95em;
+            line-height: 1.5;
+            display: none;
+            color: var(--ink);
+            font-family: var(--sans);
+        }
+        .tab-panel.active { display: block; }
+        .qa-item { margin-bottom: 10px; }
+        .mindmap-block {
+            background: var(--accent-soft);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+            font-size: 0.85em;
+            white-space: pre-wrap;
+            color: #4a3b2f;
+        }
 
         /* Main Content */
-        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
-        .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; }
+        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; background: transparent; }
+        .content-container {
+            max-width: 900px;
+            margin: 36px auto 28px;
+            padding: 34px 44px 48px;
+            line-height: 1.7;
+            font-size: 1.08em;
+            color: var(--ink);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 18px 36px rgba(0, 0, 0, 0.05);
+        }
 
         /* Content Styling (Basic normalization for the book HTML) */
-        .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
-        .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
-        .book-content p { margin-bottom: 1.5em; text-align: justify; }
+        .book-content { max-width: 70ch; margin: 0 auto; }
+        .book-content img { max-width: 100%; height: auto; display: block; margin: 24px auto; border-radius: 8px; }
+        .book-content h1, .book-content h2, .book-content h3 {
+            font-family: var(--sans);
+            margin: 1.2em 0 0.6em;
+            color: #1c1813;
+            letter-spacing: -0.015em;
+            line-height: 1.3;
+        }
+        .book-content p {
+            margin: 0 0 1.2em;
+            text-align: left;
+            hyphens: auto;
+            font-variant-ligatures: common-ligatures;
+            text-indent: 1.2em;
+            word-spacing: 0.02em;
+        }
+        .book-content p:first-of-type,
+        .book-content h1 + p,
+        .book-content h2 + p,
+        .book-content h3 + p,
+        .paragraph .paragraph-text p:first-child {
+            text-indent: 0;
+        }
+        .book-content p + p { margin-top: 0.35em; }
+
+        /* Importance + summaries */
+        .paragraph {
+            margin-bottom: 1.3em;
+            padding: 10px 14px;
+            border-radius: 10px;
+            transition: background 0.2s, opacity 0.2s, transform 0.2s;
+            border-left: 4px solid transparent;
+        }
+        .paragraph:hover { background: #f7efe3; transform: translateX(2px); }
+        .importance-high { border-left-color: #c65f2d; font-weight: 600; }
+        .importance-medium { border-left-color: #d7a16b; }
+        .importance-low { border-left-color: #d9d1c6; opacity: 0.9; }
+        .importance-none { border-left-color: transparent; }
+        .paragraph-summary {
+            font-family: var(--sans);
+            font-size: 0.92em;
+            color: var(--muted);
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: #f3ece1;
+            border-radius: 8px;
+            display: none;
+        }
+        .paragraph.show-summary .paragraph-summary { display: block; }
+        .paragraph .summary-toggle {
+            font-family: var(--sans);
+            font-size: 0.88em;
+            color: var(--accent);
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        /* Section meta header */
+        .section-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 2rem;
+            font-family: var(--sans);
+            font-size: 0.8em;
+            color: var(--muted);
+        }
+        .section-label {
+            font-size: 0.92em;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+        .section-breadcrumb {
+            display: flex;
+            margin: 1rem 0 3rem 0;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-book-title {
+            background: var(--accent-soft);
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            color: var(--ink);
+            max-width: 360px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border: 1px solid var(--border);
+        }
+        .section-chip {
+            background: var(--accent-soft);
+            border: 1px solid var(--border);
+            color: var(--ink);
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        .section-sep {
+            color: var(--muted);
+            font-weight: 700;
+            font-size: 1em;
+        }
+        .section-heading {
+            font-family: var(--sans);
+            font-size: 1.4em;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: -0.01em;
+            margin-top: 4px;
+            text-align: center;
+        }
 
         /* Navigation Footer */
-        .chapter-nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-family: -apple-system, sans-serif; }
-        .nav-btn { text-decoration: none; color: #3498db; font-weight: bold; padding: 10px 20px; border: 1px solid #3498db; border-radius: 4px; transition: all 0.2s; }
-        .nav-btn:hover { background: #3498db; color: white; }
-        .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #ccc; color: #ccc; }
+        .chapter-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            padding-top: 22px;
+            border-top: 1px solid var(--border);
+            font-family: var(--sans);
+            align-items: center;
+        }
+        .nav-btn {
+            text-decoration: none;
+            color: var(--accent);
+            font-weight: 700;
+            padding: 10px 18px;
+            border: 1px solid var(--accent);
+            border-radius: 999px;
+            transition: all 0.2s;
+            letter-spacing: 0.01em;
+            background: #fff;
+        }
+        .nav-btn:hover { background: var(--accent); color: white; box-shadow: 0 10px 22px rgba(198, 95, 45, 0.2); }
+        .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #d3c5b7; color: #c8bcb0; background: #f7f1e9; }
 
+        /* Mode toggles */
+        .mode-bar { display: flex; gap: 10px; margin-bottom: 20px; font-family: var(--sans); flex-wrap: wrap; }
+        .mode-bar button {
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 9px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            color: var(--muted);
+            transition: all 0.15s ease;
+            font-weight: 600;
+        }
+        .mode-bar button.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 8px 16px rgba(198, 95, 45, 0.2);
+        }
+        #process-ai { margin-left: auto; }
+
+        .processing-banner {
+            font-family: var(--sans);
+            font-size: 0.9em;
+            color: #7d510d;
+            background: #fff3cd;
+            padding: 9px 12px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            display: none;
+            border: 1px solid #f1deb0;
+        }
+        .processing-banner.show { display: block; }
     </style>
 </head>
 <body>
@@ -44,45 +337,18 @@
     <div id="sidebar">
         <a href="/" class="nav-home">← Back to Library</a>
         <div class="nav-header">{{ book.metadata.title }}</div>
+        <div class="author-line">{{ book.metadata.authors | join(', ') }}</div>
 
         <!-- Recursive Macro for TOC -->
         {% macro render_toc(items) %}
             <ul class="toc-list">
             {% for item in items %}
                 <li class="toc-item">
-                    <!--
-                        Matching Logic:
-                        If the TOC item filename matches the current chapter filename, mark active.
-                        Ideally we match spine indices, but Reader 3 TOC maps to filenames.
-                        We use a simple hash matching logic here.
-                    -->
                     {% set is_active = current_chapter.href == item.file_href %}
-
-                    <!--
-                       We need to find which linear chapter index (0, 1, 2) corresponds
-                       to this TOC entry file.
-                       Since that's hard to calculate in Jinja, we just link to the
-                       file anchor. BUT, to make our linear navigation work, we
-                       rely on the fact that the user is currently reading 'chapter_index'.
-
-                       Ideally, clicking a TOC link should find the 'index' of that file.
-                       For simplicity in this version: We link to the 'href' (filename)
-                       and let JavaScript or Backend handle it?
-
-                       Actually, let's just link to the file. The browser interprets #anchors.
-                       However, our router uses /read/book/INDEX.
-
-                       SIMPLE FIX: We won't link the TOC to the route index in this simple version
-                       unless we build a map. We will visually show structure,
-                       but rely on "Previous/Next" for linear reading.
-
-                       BETTER FIX: Use JavaScript to match filenames.
-                    -->
                     <a href="#" onclick="findAndGo('{{ item.file_href }}')"
                        class="toc-link {% if is_active %}active{% endif %}">
                         {{ item.title }}
                     </a>
-
                     {% if item.children %}
                         {{ render_toc(item.children) }}
                     {% endif %}
@@ -92,13 +358,97 @@
         {% endmacro %}
 
         {{ render_toc(book.toc) }}
+
+        <div class="sidebar-section">
+            <div class="sidebar-tabs">
+                <button class="tab-btn active" data-tab="summary">Summary</button>
+                <button class="tab-btn" data-tab="qa">Q&A</button>
+                <button class="tab-btn" data-tab="reflections">Reflections</button>
+                <button class="tab-btn" data-tab="mindmap">Mind Map</button>
+            </div>
+
+            <div id="tab-summary" class="tab-panel active">
+                {% if ai_doc and ai_doc.chapter_summary_short %}
+                    <strong>Short:</strong> {{ ai_doc.chapter_summary_short }}<br><br>
+                    {% if ai_doc.chapter_summary_long %}<strong>Long:</strong> {{ ai_doc.chapter_summary_long }}{% endif %}
+                {% else %}
+                    <em>No AI summary yet.</em>
+                {% endif %}
+            </div>
+
+            <div id="tab-qa" class="tab-panel">
+                {% if ai_doc and ai_doc.qa_items %}
+                    {% for qa in ai_doc.qa_items %}
+                        <div class="qa-item"><strong>Q:</strong> {{ qa.question }}<br><strong>A:</strong> {{ qa.answer }}</div>
+                    {% endfor %}
+                {% else %}
+                    <em>No Q&A yet.</em>
+                {% endif %}
+            </div>
+
+            <div id="tab-reflections" class="tab-panel">
+                {% if ai_doc and ai_doc.reflection_prompts %}
+                    <ul>
+                    {% for prompt in ai_doc.reflection_prompts %}
+                        <li>{{ prompt }}</li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <em>No reflection prompts yet.</em>
+                {% endif %}
+            </div>
+
+            <div id="tab-mindmap" class="tab-panel">
+                {% if ai_doc and ai_doc.mindmap_mermaid %}
+                    <div class="mindmap-block">{{ ai_doc.mindmap_mermaid }}</div>
+                {% else %}
+                    <em>No mind map yet.</em>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     <!-- MAIN CONTENT -->
     <div id="main">
         <div class="content-container">
+            <div class="processing-banner" id="processing-banner">Processing... check console for updates.</div>
+            {% set path = section_path if section_path is defined and section_path else [{'title': current_chapter.title}] %}
+            {% set current_section = path|last %}
+            <div class="section-meta">
+                <!-- <div class="section-label">Section -->
+                <div class="section-breadcrumb">
+                    <span class="section-book-title" title="{{ book.metadata.title }}">{{ book.metadata.title | truncate(60) }}</span>
+                    <span class="section-sep">›</span>
+                    {% for node in path %}
+                        <span class="">{{ node.title }}</span>
+                        {% if not loop.last %}<span class="section-sep">›</span>{% endif %}
+                    {% endfor %}
+                <!-- </div> -->
+                </div>
+                {% if current_section %}
+                    <div class="section-heading">{{ current_section.title }}</div>
+                {% endif %}
+            </div>
+            <div class="mode-bar">
+                <button class="mode-btn active" data-mode="read">Read</button>
+                <button class="mode-btn" data-mode="summary">Summary Mode</button>
+                <button class="mode-btn" data-mode="qa">Q&A Mode</button>
+                <button id="process-ai" class="mode-btn" data-mode="process">Process AI</button>
+            </div>
             <div class="book-content">
-                {{ current_chapter.content | safe }}
+                {% if paragraphs %}
+                    {% for p in paragraphs %}
+                        <div class="paragraph {{ p.importance_class }}" data-paragraph-id="{{ p.id }}">
+                            <div class="paragraph-text">{{ p.html | safe }}</div>
+                            {% if p.summary_ai %}
+                                <div class="summary-toggle" onclick="toggleSummary(this)">Show summary</div>
+                                <div class="paragraph-summary">{{ p.summary_ai }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    {{ current_chapter.content | safe }}
+                {% endif %}
             </div>
 
             <div class="chapter-nav">
@@ -123,7 +473,6 @@
 
     <script>
         // Helper to map TOC filenames to Spine Indices
-        // Pass the spine data from python to JS
         const spineMap = {
             {% for ch in book.spine %}
             "{{ ch.href }}": {{ ch.order }},
@@ -131,22 +480,66 @@
         };
 
         function findAndGo(filename) {
-            // The TOC usually has specific filenames e.g. "text/part001.html"
-            // Sometimes it has anchors "text/part001.html#header"
-            // We strip the anchor to find the page index
             const cleanFile = filename.split('#')[0];
-            const anchor = filename.split('#')[1];
-
             const idx = spineMap[cleanFile];
-
             if (idx !== undefined) {
-                let url = "/read/{{ book_id }}/" + idx;
-                // If there was an anchor, we could try to scroll to it,
-                // but simple page loads often lose anchor position without extra JS.
-                // Let's just go to the page.
-                window.location.href = url;
+                window.location.href = "/read/{{ book_id }}/" + idx;
             } else {
                 console.log("Could not find index for", filename);
+            }
+        }
+
+        // Tab handling
+        const tabButtons = document.querySelectorAll(".tab-btn");
+        const tabPanels = document.querySelectorAll(".tab-panel");
+        tabButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                tabButtons.forEach(b => b.classList.remove("active"));
+                tabPanels.forEach(p => p.classList.remove("active"));
+                btn.classList.add("active");
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+            });
+        });
+
+        // Mode toggles (cosmetic for now)
+        const modeButtons = document.querySelectorAll(".mode-btn");
+        modeButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                if (btn.id === "process-ai") {
+                    triggerAI();
+                    return;
+                }
+                modeButtons.forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                const mode = btn.dataset.mode;
+                document.body.setAttribute("data-mode", mode);
+            });
+        });
+
+        // Paragraph summary toggle
+        function toggleSummary(el) {
+            const wrapper = el.closest(".paragraph");
+            wrapper.classList.toggle("show-summary");
+            el.textContent = wrapper.classList.contains("show-summary") ? "Hide summary" : "Show summary";
+        }
+
+        // On-demand AI trigger
+        async function triggerAI() {
+            const banner = document.getElementById("processing-banner");
+            banner.classList.add("show");
+            try {
+                const resp = await fetch(`/read/{{ book_id }}/{{ chapter_index }}/process_ai`, { method: "POST" });
+                if (!resp.ok) {
+                    throw new Error(`Failed: ${resp.status}`);
+                }
+                const data = await resp.json();
+                console.log("AI result", data);
+                window.location.reload();
+            } catch (err) {
+                console.error(err);
+                alert("AI processing failed: " + err.message);
+            } finally {
+                banner.classList.remove("show");
             }
         }
     </script>

@@ -1,20 +1,62 @@
 import os
 import pickle
+import json
+from pathlib import Path
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from urllib.parse import unquote
 
 from reader3 import Book, BookMetadata, ChapterContent, TOCEntry
+from ai_processing import process_chapter_ai
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 # Where are the book folders located?
 BOOKS_DIR = "."
+
+
+def load_json_if_exists(path: str) -> Optional[Dict[str, Any]]:
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
+def combine_paragraph_annotations(paragraphs: List[Dict[str, Any]], ai_doc: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Merge paragraph text/html with AI annotations for rendering.
+    """
+    annotations = {}
+    if ai_doc:
+        for ann in ai_doc.get("paragraph_annotations", []):
+            annotations[ann.get("paragraph_id")] = ann
+
+    combined = []
+    for p in paragraphs:
+        ann = annotations.get(p["id"], {})
+        score = ann.get("importance_score")
+        importance_class = "importance-none"
+        if isinstance(score, (int, float)):
+            if score >= 0.75:
+                importance_class = "importance-high"
+            elif score >= 0.4:
+                importance_class = "importance-medium"
+            else:
+                importance_class = "importance-low"
+
+        combined.append({
+            **p,
+            "importance_score": score,
+            "importance_class": importance_class,
+            "summary_ai": ann.get("summary"),
+        })
+
+    return combined
 
 @lru_cache(maxsize=10)
 def load_book_cached(folder_name: str) -> Optional[Book]:
@@ -34,6 +76,68 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
         print(f"Error loading book {folder_name}: {e}")
         return None
 
+
+def find_cover_image(book_id: str, book: Book) -> Optional[str]:
+    """
+    Attempt to find a cover image path for the given book by scanning its image map.
+    Prefers filenames containing 'cover'; falls back to the first image if none match.
+    Returns a URL usable by the /read/{book_id}/images/{image_name} route.
+    """
+    if not book or not book.images:
+        return None
+
+    # Prefer image keys that look like a cover
+    def pick_first(paths: List[str]) -> Optional[str]:
+        for p in paths:
+            if p:
+                return p
+        return None
+
+    cover_candidates = [rel for orig, rel in book.images.items() if "cover" in orig.lower() or "cover" in rel.lower()]
+    rel_path = pick_first(cover_candidates) or pick_first(list(book.images.values()))
+
+    if not rel_path:
+        return None
+
+    rel_path = rel_path.lstrip("./")
+    # book.images values are typically like "images/<file>"
+    if rel_path.startswith("images/"):
+        image_name = os.path.basename(rel_path)
+        return f"/read/{book_id}/images/{image_name}"
+
+    return f"/read/{book_id}/{rel_path}"
+
+
+def find_section_path(toc: List[TOCEntry], target_href: str) -> List[Dict[str, str]]:
+    """
+    Return a breadcrumb-like list of dicts from the root TOC to the matching href.
+    Each entry contains title and href (file_href) for display.
+    """
+    def normalize(h: str) -> str:
+        cleaned = unquote(h or "").lstrip("./")
+        return cleaned.split("#")[0]
+
+    target_norm = normalize(target_href)
+    target_base = os.path.basename(target_norm)
+
+    def matches(node_href: str) -> bool:
+        node_norm = normalize(node_href)
+        node_base = os.path.basename(node_norm)
+        return node_norm == target_norm or node_base == target_base
+
+    def walk(nodes: List[TOCEntry], path: List[Dict[str, str]]) -> Optional[List[Dict[str, str]]]:
+        for node in nodes:
+            current = path + [{"title": node.title, "href": node.file_href}]
+            if matches(node.file_href):
+                return current
+            if node.children:
+                found = walk(node.children, current)
+                if found:
+                    return found
+        return None
+
+    return walk(toc, []) or []
+
 @app.get("/", response_class=HTMLResponse)
 async def library_view(request: Request):
     """Lists all available processed books."""
@@ -50,7 +154,8 @@ async def library_view(request: Request):
                         "id": item,
                         "title": book.metadata.title,
                         "author": ", ".join(book.metadata.authors),
-                        "chapters": len(book.spine)
+                        "chapters": len(book.spine),
+                        "cover_url": find_cover_image(item, book)
                     })
 
     return templates.TemplateResponse("library.html", {"request": request, "books": books})
@@ -71,10 +176,21 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         raise HTTPException(status_code=404, detail="Chapter not found")
 
     current_chapter = book.spine[chapter_index]
+    book_dir = os.path.join(BOOKS_DIR, book_id)
+
+    # Optional structured chapter and AI docs
+    chapter_doc = load_json_if_exists(os.path.join(book_dir, "chapters", f"{chapter_index}.json"))
+    ai_doc = load_json_if_exists(os.path.join(book_dir, "ai", f"{chapter_index}.json"))
+    paragraphs_for_render = []
+    if chapter_doc and chapter_doc.get("paragraphs"):
+        paragraphs_for_render = combine_paragraph_annotations(chapter_doc["paragraphs"], ai_doc)
 
     # Calculate Prev/Next links
     prev_idx = chapter_index - 1 if chapter_index > 0 else None
     next_idx = chapter_index + 1 if chapter_index < len(book.spine) - 1 else None
+    section_path = find_section_path(book.toc, current_chapter.href)
+    if not section_path:
+        section_path = [{"title": current_chapter.title, "href": current_chapter.href}]
 
     return templates.TemplateResponse("reader.html", {
         "request": request,
@@ -83,7 +199,11 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         "chapter_index": chapter_index,
         "book_id": book_id,
         "prev_idx": prev_idx,
-        "next_idx": next_idx
+        "next_idx": next_idx,
+        "chapter_doc": chapter_doc,
+        "ai_doc": ai_doc,
+        "paragraphs": paragraphs_for_render,
+        "section_path": section_path,
     })
 
 @app.get("/read/{book_id}/images/{image_name}")
@@ -103,6 +223,25 @@ async def serve_image(book_id: str, image_name: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
     return FileResponse(img_path)
+
+
+@app.post("/read/{book_id}/{chapter_index}/process_ai")
+async def process_ai_endpoint(book_id: str, chapter_index: int):
+    """
+    On-demand trigger for AI processing. Returns the stored AI doc.
+    """
+    book_dir = os.path.join(BOOKS_DIR, book_id)
+    if not os.path.isdir(book_dir):
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    try:
+        result = await process_chapter_ai(Path(book_dir), chapter_index, force=False)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Chapter data missing")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return JSONResponse(result.to_dict())
 
 if __name__ == "__main__":
     import uvicorn

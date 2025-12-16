@@ -10,4 +10,6 @@ dependencies = [
     "fastapi>=0.121.2",
     "jinja2>=3.1.6",
     "uvicorn>=0.38.0",
+    "pydantic-ai>=0.0.10",
+    "logfire>=0.7.0",
 ]

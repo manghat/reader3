@@ -5,6 +5,8 @@ Parses an EPUB file into a structured object that can be used to serve the book 
 import os
 import pickle
 import shutil
+import json
+import hashlib
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -91,6 +93,66 @@ def extract_plain_text(soup: BeautifulSoup) -> str:
     text = soup.get_text(separator=' ')
     # Collapse whitespace
     return ' '.join(text.split())
+
+
+def split_paragraphs(soup: BeautifulSoup) -> List[Dict[str, str]]:
+    """
+    Extract paragraphs with both HTML and text content.
+    Primary strategy: all <p> tags. Fallback: split by double newline from text.
+    """
+    paragraphs = []
+    p_tags = soup.find_all('p')
+
+    if p_tags:
+        for idx, p in enumerate(p_tags):
+            html = str(p)
+            text = ' '.join(p.get_text(separator=' ').split())
+            paragraphs.append({
+                "id": f"p{idx}",
+                "index": idx,
+                "html": html,
+                "text": text
+            })
+    else:
+        # Fallback: use plain text and split by blank lines
+        plain = extract_plain_text(soup)
+        chunks = [c.strip() for c in plain.split('\n\n') if c.strip()]
+        for idx, chunk in enumerate(chunks):
+            paragraphs.append({
+                "id": f"p{idx}",
+                "index": idx,
+                "html": f"<p>{chunk}</p>",
+                "text": chunk
+            })
+
+    return paragraphs
+
+
+def save_paragraphs_json(paragraphs: List[Dict[str, str]], output_dir: str, idx: int):
+    """
+    Save paragraph-level data per chapter to chapters/<idx>.json.
+    Includes a content hash to allow caching AI results.
+    """
+    chapters_dir = os.path.join(output_dir, "chapters")
+    os.makedirs(chapters_dir, exist_ok=True)
+
+    # Hash over concatenated paragraph text for stability
+    hasher = hashlib.sha256()
+    for p in paragraphs:
+        hasher.update(p["text"].encode("utf-8"))
+    content_hash = hasher.hexdigest()
+
+    payload = {
+        "chapter_index": idx,
+        "paragraphs": paragraphs,
+        "content_hash": content_hash,
+        "saved_at": datetime.now().isoformat()
+    }
+
+    out_path = os.path.join(chapters_dir, f"{idx}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    print(f"Wrote paragraphs to {out_path}")
 
 
 def parse_toc_recursive(toc_list, depth=0) -> List[TOCEntry]:
@@ -186,13 +248,20 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
         shutil.rmtree(output_dir)
     images_dir = os.path.join(output_dir, 'images')
     os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(os.path.join(output_dir, "chapters"), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, "ai"), exist_ok=True)
 
     # 4. Extract Images & Build Map
     print("Extracting images...")
     image_map = {} # Key: internal_path, Value: local_relative_path
 
     for item in book.get_items():
-        if item.get_type() == ebooklib.ITEM_IMAGE:
+        # Treat anything with image media_type as an asset (covers sometimes differ)
+        if hasattr(item, "get_media_type"):
+            media_type = item.get_media_type() or ""
+        else:
+            media_type = getattr(item, "media_type", "") or ""
+        if media_type.startswith("image/"):
             # Normalize filename
             original_fname = os.path.basename(item.get_name())
             # Sanitize filename for OS
@@ -258,6 +327,10 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
                 final_html = "".join([str(x) for x in body.contents])
             else:
                 final_html = str(soup)
+
+            # E. Paragraph extraction for downstream AI overlays
+            paragraphs = split_paragraphs(soup)
+            save_paragraphs_json(paragraphs, output_dir, i)
 
             # D. Create Object
             chapter = ChapterContent(
