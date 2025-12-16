@@ -1,0 +1,1 @@
+Stabilize chapter AI pipeline — tighten per-chapter AI job flow (error handling, retries, caching), ensure explain/summarize/mind map/Q&A payloads are generated deterministically and stored per chapter.
