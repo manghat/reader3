@@ -70,6 +70,7 @@ def _configure_logfire_if_possible() -> None:
 
 _load_env_from_file()
 _configure_logfire_if_possible()
+AI_CALL_TIMEOUT = float(os.getenv("READER3_AI_TIMEOUT", "30.0"))
 
 
 @dataclass
@@ -391,6 +392,8 @@ async def process_chapter_ai(book_dir: Path, chapter_index: int, force: bool = F
                 force=force,
                 use_stub=use_stub,
                 run_id=run_id,
+                model=model,
+                timeout_s=AI_CALL_TIMEOUT,
             )
 
         agent: Optional[Agent] = None
@@ -409,7 +412,10 @@ async def process_chapter_ai(book_dir: Path, chapter_index: int, force: bool = F
                 result.model_settings = model_settings
                 result.run_id = run_id
             else:
-                ai_result = await _run_with_retries(agent, paragraphs)
+                ai_result = await asyncio.wait_for(
+                    _run_with_retries(agent, paragraphs),
+                    timeout=AI_CALL_TIMEOUT,
+                )
                 result = ChapterAIResult(
                     chapter_index=chapter_index,
                     content_hash=content_hash,
@@ -433,6 +439,7 @@ async def process_chapter_ai(book_dir: Path, chapter_index: int, force: bool = F
                     book_dir=str(book_dir),
                     chapter_index=chapter_index,
                     run_id=run_id,
+                    model=model,
                 )
             result = _record_failure(
                 chapter_index=chapter_index,
@@ -461,5 +468,6 @@ async def process_chapter_ai(book_dir: Path, chapter_index: int, force: bool = F
                 source=result.source,
                 duration_ms=result.run_duration_ms,
                 model=result.model,
+                error=result.error,
             )
         return result

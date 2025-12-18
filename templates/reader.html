@@ -238,16 +238,16 @@
             gap: 8px;
         }
         .section-book-title {
-            background: var(--accent-soft);
+            /* background: var(--accent-soft); */
             padding: 8px 12px;
-            border-radius: 999px;
+            /* border-radius: 999px; */
             font-weight: 700;
             color: var(--ink);
             max-width: 360px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            border: 1px solid var(--border);
+            /* border: 1px solid var(--border); */
         }
         .section-chip {
             background: var(--accent-soft);
@@ -297,70 +297,8 @@
         .nav-btn:hover { background: var(--accent); color: white; box-shadow: 0 10px 22px rgba(198, 95, 45, 0.2); }
         .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #d3c5b7; color: #c8bcb0; background: #f7f1e9; }
 
-        /* Mode toggles */
-        .mode-bar { display: flex; gap: 10px; margin-bottom: 20px; font-family: var(--sans); flex-wrap: wrap; }
-        .mode-bar button {
-            border: 1px solid var(--border);
-            background: #fff;
-            padding: 9px 14px;
-            border-radius: 999px;
-            cursor: pointer;
-            color: var(--muted);
-            transition: all 0.15s ease;
-            font-weight: 600;
-        }
-        .mode-bar button.active {
-            background: var(--accent);
-            color: #fff;
-            border-color: var(--accent);
-            box-shadow: 0 8px 16px rgba(198, 95, 45, 0.2);
-        }
-        #process-ai { margin-left: auto; }
-
-        .processing-banner {
-            font-family: var(--sans);
-            font-size: 0.9em;
-            color: #7d510d;
-            background: #fff3cd;
-            padding: 9px 12px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-            display: none;
-            border: 1px solid #f1deb0;
-        }
-        .processing-banner.show { display: block; }
-
-        .ai-status {
-            font-family: var(--sans);
-            margin-bottom: 12px;
-            display: grid;
-            gap: 6px;
-        }
-        .ai-status-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-        .status-pill {
-            padding: 6px 10px;
-            border-radius: 999px;
-            font-weight: 700;
-            font-size: 0.85em;
-            border: 1px solid var(--border);
-        }
-        .status-pill.success { background: #e4f6eb; color: #1b7a3e; border-color: #b5e0c3; }
-        .status-pill.failed { background: #ffecec; color: #a50000; border-color: #ffc4c4; }
-        .status-pill.processing { background: #fff3cd; color: #7d510d; border-color: #f1deb0; }
-        .status-pill.idle { background: #f1f1f1; color: #555; }
-        .ai-meta { color: #666; font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 8px; }
-        .ai-error { color: #a50000; font-size: 0.9em; }
-
         @media (max-width: 720px) {
             #main { margin-left: 0; padding: 20px; }
-            .mode-bar { justify-content: flex-start; }
-            #process-ai { margin-left: 0; }
-            .ai-meta { flex-direction: column; }
         }
     </style>
 </head>
@@ -391,74 +329,17 @@
         {% endmacro %}
 
         {{ render_toc(book.toc) }}
-
-        <div class="sidebar-section">
-            <div class="sidebar-tabs">
-                <button class="tab-btn active" data-tab="summary">Summary</button>
-                <button class="tab-btn" data-tab="qa">Q&A</button>
-                <button class="tab-btn" data-tab="reflections">Reflections</button>
-                <button class="tab-btn" data-tab="mindmap">Mind Map</button>
-            </div>
-
-            <div id="tab-summary" class="tab-panel active">
-                {% if ai_doc and ai_doc.chapter_summary_short %}
-                    <strong>Short:</strong> {{ ai_doc.chapter_summary_short }}<br><br>
-                    {% if ai_doc.chapter_summary_long %}<strong>Long:</strong> {{ ai_doc.chapter_summary_long }}{% endif %}
-                {% else %}
-                    <em>No AI summary yet.</em>
-                {% endif %}
-            </div>
-
-            <div id="tab-qa" class="tab-panel">
-                {% if ai_doc and ai_doc.qa_items %}
-                    {% for qa in ai_doc.qa_items %}
-                        <div class="qa-item"><strong>Q:</strong> {{ qa.question }}<br><strong>A:</strong> {{ qa.answer }}</div>
-                    {% endfor %}
-                {% else %}
-                    <em>No Q&A yet.</em>
-                {% endif %}
-            </div>
-
-            <div id="tab-reflections" class="tab-panel">
-                {% if ai_doc and ai_doc.reflection_prompts %}
-                    <ul>
-                    {% for prompt in ai_doc.reflection_prompts %}
-                        <li>{{ prompt }}</li>
-                    {% endfor %}
-                    </ul>
-                {% else %}
-                    <em>No reflection prompts yet.</em>
-                {% endif %}
-            </div>
-
-            <div id="tab-mindmap" class="tab-panel">
-                {% if ai_doc and ai_doc.mindmap_mermaid %}
-                    <div class="mindmap-block">{{ ai_doc.mindmap_mermaid }}</div>
-                {% else %}
-                    <em>No mind map yet.</em>
-                {% endif %}
-            </div>
-        </div>
     </div>
 
     <!-- MAIN CONTENT -->
     <div id="main">
         <div class="content-container">
-            <div class="processing-banner" id="processing-banner">Processing... check console for updates.</div>
-            <div class="ai-status" id="ai-status">
-                <div class="ai-status-row">
-                    <span class="status-pill idle" id="ai-status-pill">Idle</span>
-                    <span class="ai-meta" id="ai-status-text">Not processed yet.</span>
-                </div>
-                <div class="ai-meta" id="ai-status-meta"></div>
-                <div class="ai-error" id="ai-status-error"></div>
-            </div>
             {% set path = section_path if section_path is defined and section_path else [{'title': current_chapter.title}] %}
             {% set current_section = path|last %}
             <div class="section-meta">
                 <!-- <div class="section-label">Section -->
                 <div class="section-breadcrumb">
-                    <span class="section-book-title" title="{{ book.metadata.title }}">{{ book.metadata.title | truncate(60) }}</span>
+                    <span class="" title="{{ book.metadata.title }}">{{ book.metadata.title | truncate(60) }}</span>
                     <span class="section-sep">›</span>
                     {% for node in path %}
                         <span class="">{{ node.title }}</span>
@@ -469,12 +350,6 @@
                 {% if current_section %}
                     <div class="section-heading">{{ current_section.title }}</div>
                 {% endif %}
-            </div>
-            <div class="mode-bar">
-                <button class="mode-btn active" data-mode="read">Read</button>
-                <button class="mode-btn" data-mode="summary">Summary Mode</button>
-                <button class="mode-btn" data-mode="qa">Q&A Mode</button>
-                <button id="process-ai" class="mode-btn" data-mode="process">Process AI</button>
             </div>
             <div class="book-content">
                 {% if paragraphs %}
@@ -520,53 +395,6 @@
             {% endfor %}
         };
 
-        const aiDoc = {{ ai_doc_json | safe }};
-        const aiStatusPill = document.getElementById("ai-status-pill");
-        const aiStatusText = document.getElementById("ai-status-text");
-        const aiStatusMeta = document.getElementById("ai-status-meta");
-        const aiStatusError = document.getElementById("ai-status-error");
-
-        function formatStatus(doc) {
-            const hasData = doc && Object.keys(doc).length > 0;
-            const status = doc.status || (hasData ? "success" : "idle");
-            return {
-                status,
-                source: doc.source || (hasData ? "cache" : ""),
-                run_id: doc.run_id || "",
-                created_at: doc.created_at || "",
-                error: doc.error || "",
-                run_duration_ms: doc.run_duration_ms || null,
-            };
-        }
-
-        function renderStatus(doc, isProcessing = false) {
-            const state = formatStatus(doc || {});
-            if (isProcessing) {
-                state.status = "processing";
-            }
-            aiStatusPill.className = `status-pill ${state.status}`;
-            aiStatusPill.textContent = state.status.charAt(0).toUpperCase() + state.status.slice(1);
-
-            if (state.status === "processing") {
-                aiStatusText.textContent = "Processing chapter AI...";
-            } else if (state.status === "failed") {
-                aiStatusText.textContent = "AI run failed. Please retry.";
-            } else if (state.status === "success") {
-                aiStatusText.textContent = `AI overlays ready (${state.source || "fresh"}).`;
-            } else {
-                aiStatusText.textContent = "Not processed yet.";
-            }
-
-            const metaParts = [];
-            if (state.created_at) metaParts.push(`Last run: ${state.created_at}`);
-            if (state.run_duration_ms) metaParts.push(`Duration: ${state.run_duration_ms} ms`);
-            if (state.source && state.status !== "processing") metaParts.push(`Source: ${state.source}`);
-            aiStatusMeta.textContent = metaParts.join(" • ");
-            aiStatusError.textContent = state.error ? `Error: ${state.error}` : "";
-        }
-
-        renderStatus(aiDoc);
-
         function findAndGo(filename) {
             const cleanFile = filename.split('#')[0];
             const idx = spineMap[cleanFile];
@@ -577,63 +405,11 @@
             }
         }
 
-        // Tab handling
-        const tabButtons = document.querySelectorAll(".tab-btn");
-        const tabPanels = document.querySelectorAll(".tab-panel");
-        tabButtons.forEach(btn => {
-            btn.addEventListener("click", () => {
-                tabButtons.forEach(b => b.classList.remove("active"));
-                tabPanels.forEach(p => p.classList.remove("active"));
-                btn.classList.add("active");
-                document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
-            });
-        });
-
-        // Mode toggles (cosmetic for now)
-        const modeButtons = document.querySelectorAll(".mode-btn");
-        modeButtons.forEach(btn => {
-            btn.addEventListener("click", () => {
-                if (btn.id === "process-ai") {
-                    triggerAI();
-                    return;
-                }
-                modeButtons.forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                const mode = btn.dataset.mode;
-                document.body.setAttribute("data-mode", mode);
-            });
-        });
-
         // Paragraph summary toggle
         function toggleSummary(el) {
             const wrapper = el.closest(".paragraph");
             wrapper.classList.toggle("show-summary");
             el.textContent = wrapper.classList.contains("show-summary") ? "Hide summary" : "Show summary";
-        }
-
-        // On-demand AI trigger
-        async function triggerAI() {
-            const banner = document.getElementById("processing-banner");
-            banner.classList.add("show");
-            renderStatus(aiDoc, true);
-            try {
-                const resp = await fetch(`/read/{{ book_id }}/{{ chapter_index }}/process_ai`, { method: "POST" });
-                if (!resp.ok) {
-                    throw new Error(`Failed: ${resp.status}`);
-                }
-                const data = await resp.json();
-                Object.assign(aiDoc, data);
-                renderStatus(aiDoc);
-                if (data.status !== "failed") {
-                    window.location.reload();
-                }
-            } catch (err) {
-                console.error(err);
-                renderStatus({ status: "failed", error: err.message });
-                alert("AI processing failed: " + err.message);
-            } finally {
-                banner.classList.remove("show");
-            }
         }
     </script>
 </body>

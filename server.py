@@ -1,19 +1,31 @@
+import json
 import os
 import pickle
-import json
-from pathlib import Path
 from functools import lru_cache
-from typing import Optional, Dict, Any, List
-
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from urllib.parse import unquote
 
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+
 from reader3 import Book, BookMetadata, ChapterContent, TOCEntry
-from ai_processing import process_chapter_ai
+from ai_hello import run_hello, AIHelloError
+
+
+import logfire  # type: ignore
+
+load_dotenv(override=False)
 
 app = FastAPI()
+
+env = os.getenv("LOGFIRE_ENV", "local")
+logfire.configure(environment=env)
+logfire.instrument_fastapi(app)
+logfire.instrument_pydantic_ai()  # instrument PydanticAI agents
+    
 templates = Jinja2Templates(directory="templates")
 
 # Where are the book folders located?
@@ -57,6 +69,18 @@ def combine_paragraph_annotations(paragraphs: List[Dict[str, Any]], ai_doc: Opti
         })
 
     return combined
+
+
+@app.get("/api/hello-ai", response_class=JSONResponse)
+async def hello_ai(model: Optional[str] = None):
+    """
+    Simple AI smoke test endpoint. Returns a short message to confirm model connectivity.
+    """
+    try:
+        result = await run_hello(model=model)
+        return JSONResponse(result)
+    except AIHelloError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @lru_cache(maxsize=10)
 def load_book_cached(folder_name: str) -> Optional[Book]:
@@ -180,7 +204,7 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
 
     # Optional structured chapter and AI docs
     chapter_doc = load_json_if_exists(os.path.join(book_dir, "chapters", f"{chapter_index}.json"))
-    ai_doc = load_json_if_exists(os.path.join(book_dir, "ai", f"{chapter_index}.json"))
+    ai_doc = None
     paragraphs_for_render = []
     if chapter_doc and chapter_doc.get("paragraphs"):
         paragraphs_for_render = combine_paragraph_annotations(chapter_doc["paragraphs"], ai_doc)
@@ -202,7 +226,6 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         "next_idx": next_idx,
         "chapter_doc": chapter_doc,
         "ai_doc": ai_doc,
-        "ai_doc_json": json.dumps(ai_doc or {}),
         "paragraphs": paragraphs_for_render,
         "section_path": section_path,
     })
@@ -225,24 +248,6 @@ async def serve_image(book_id: str, image_name: str):
 
     return FileResponse(img_path)
 
-
-@app.post("/read/{book_id}/{chapter_index}/process_ai")
-async def process_ai_endpoint(book_id: str, chapter_index: int):
-    """
-    On-demand trigger for AI processing. Returns the stored AI doc.
-    """
-    book_dir = os.path.join(BOOKS_DIR, book_id)
-    if not os.path.isdir(book_dir):
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    try:
-        result = await process_chapter_ai(Path(book_dir), chapter_index, force=False)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Chapter data missing")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    return JSONResponse(result.to_dict())
 
 if __name__ == "__main__":
     import uvicorn
